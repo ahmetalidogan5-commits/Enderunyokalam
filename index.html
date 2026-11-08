@@ -14,6 +14,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- FIREBASE SDK (Web2APK ile %100 uyumlu Compat sürümü) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 button{font-family:inherit;cursor:pointer;user-select:none}
@@ -166,14 +171,29 @@ main{position:relative;z-index:1;max-width:1060px;margin:0 auto;padding:30px 20p
 <main id="app"></main>
 
 <script>
+/* ================= FIREBASE BAŞLATMA ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAxzhoj2xLABatuOJxSmrZryuumAqstdOw",
+  authDomain: "emek-enderun-yoklama.firebaseapp.com",
+  databaseURL: "https://emek-enderun-yoklama-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "emek-enderun-yoklama",
+  storageBucket: "emek-enderun-yoklama.firebasestorage.app",
+  messagingSenderId: "675111543682",
+  appId: "1:675111543682:web:b0ec4f713f79e814ae659b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ================= LOGO AYARI ================= */
 const LOGO_SRC="logo.png";
 const FALLBACK_EMBLEM=`<svg viewBox="0 0 64 64" width="100%" height="100%"><defs><linearGradient id="eg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#10b981"/><stop offset="1" stop-color="#047857"/></linearGradient></defs><g fill="none" stroke="url(#eg)" stroke-width="3"><rect x="16" y="16" width="32" height="32" rx="7"/><rect x="16" y="16" width="32" height="32" rx="7" transform="rotate(45 32 32)"/></g><circle cx="32" cy="32" r="6.5" fill="#d97706"/></svg>`;
 const EMBLEM=LOGO_SRC.trim()?`<img src="${LOGO_SRC}" alt="Bursa Enderun" onerror="this.outerHTML=FALLBACK_EMBLEM">`:FALLBACK_EMBLEM;
 
+/* ================= VERİLER ================= */
 const STUDENTS={
- 9:["Ahmet Yasin Abdussamed Şahin","Eyüp Ensari Kıncak","Faruk Selim Atacan","Mehmet Emre Ülker","Osman Kenan Çimendağ","Yunus Emre Karabulut"],
+ 9:["Ahmet Yasin Abdussamed Şahin","Mehmet Emre Ülker","Osman Kenan Çimendağ","Faruk Selim Atacan","Yunus Emre Karabulut","Eyüp Ensari Kıncak"],
  10:["Eymen Akif Uyar","Muhammed Enes Kıncak","Ahmet Furkan Balarban","Mehmet Emre Okyay","Hilmihan Kırbıyık","Ahmet Selim Erdem","Mustafa Emir Beki","Hilmi Enes Bayram","Yusuf Kemal Yetim","Muhittin Kılıç"],
- 11:["Tevfik Tuna Çakmak","Abdulkadir Düzgün","Ahmet Bedirhan Özcan","İhsan Bedir Şenol","Ahmet Enes Kuru","Ömer Faruk Cambaz","Hüseyin Emir Akkoç","Yusuf Gülcan","Ahmet Kerem Bayraktar","Mehmet Akif Çakır","Mehmet Hilmi Çelen","Sencer Çelikkanat","Kerem Yavuz Yılmaz","Arifhan İnan","İlhan Ahmet Çayır","Kerem Talha Yıldırım"],
+ 11:["Tevfik Tuna Çakmak","Abdulkadir Düzgün","Ahmet Bedirhan Özcan","İhsan Bedir Şenol","Ahmet Enes Kuru","Ömer Faruk Cambaz","Hüseyin Emir Akkoç","Yusuf Gülcan","Ahmet Kerem Bayraktar","Mehmet Akif Çakır","Mehmet Hilmi Çelen","Sencer Çelikkanat","Kerem Yavuz Yılmaz","Arifhan İnan","İlhan Ahmet Çayır"],
  12:["Mehmet Selim Demirci","Emin Kerem Akçay","Ömer Yağız Emsen","Behlül Edip Çakır","Osman Yeşilırmak","Yunus Kerem Özdemir","Mehmet Yılmaz","Mehmet Enes İnan","Ahmet Fatih Ölmez","İbrahim Yağız Yigen"]
 };
 const GRADE_STYLE={
@@ -202,14 +222,39 @@ const ITEM_META={
  "Vazife":{e:"📝",c:"#2563eb"},"Evrad-ı Şerîf":{e:"🤲",c:"#9333ea"}
 };
 
-const MIN="2026-09-01",MAX="2026-12-31",KEY="bursa_enderun_yoklama_v1";
+/* ================= TARİH & GERÇEK ZAMANLI KAYIT ================= */
+const MIN="2026-09-01", MAX="2026-12-31";
 const pad=n=>String(n).padStart(2,"0");
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const parseISO=s=>{const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c)};
-let TODAY=iso(new Date());if(TODAY<MIN)TODAY=MIN;if(TODAY>MAX)TODAY=MAX;
-let DATA;try{DATA=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){DATA={}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(DATA))}catch(e){}
- const p=document.querySelector(".savepill");if(p){p.classList.remove("flash");void p.offsetWidth;p.classList.add("flash");}}
+let TODAY=iso(new Date()); if(TODAY<MIN)TODAY=MIN; if(TODAY>MAX)TODAY=MAX;
+
+// Firebase'den verileri dinle (Real-time)
+let DATA = {};
+const dataRef = db.ref("yoklama_verileri");
+
+dataRef.on("value", (snapshot) => {
+    DATA = snapshot.val() || {};
+    // Eğer şu an bir sınıf ekranındaysak, arayüzü anında güncelle
+    if (S.grade !== null) {
+        S.animated = false;
+        renderGrade(true);
+    } else {
+        renderHome();
+    }
+});
+
+// Veriyi Firebase'e kaydet
+function save() {
+    dataRef.set(DATA).catch(err => console.error("Kayıt hatası:", err));
+    const p = document.querySelector(".savepill");
+    if (p) {
+        p.classList.remove("flash");
+        void p.offsetWidth;
+        p.classList.add("flash");
+    }
+}
+
 const itemsFor=d=>PROGRAMS[parseISO(d).getDay()];
 const dayName=d=>DAYS[parseISO(d).getDay()];
 const fmtLong=d=>parseISO(d).toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"});
@@ -219,6 +264,7 @@ function statsFor(d,g){const items=itemsFor(d);let done=0;
  const total=STUDENTS[g].length*items.length;return{done,total,missing:total-done};}
 const initials=n=>n.split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toLocaleUpperCase("tr");
 
+/* ================= DURUM ================= */
 const S={grade:null,date:TODAY,tab:"yoklama",animated:true};
 const app=document.getElementById("app");
 const $=s=>document.querySelector(s);
@@ -231,6 +277,7 @@ function tick(){const n=new Date(),el=$("#clock");if(!el)return;
 
 const pill=it=>{const m=ITEM_META[it];return `<span class="dpill" style="--cc:${m.c}">${m.e} ${it}</span>`;};
 
+/* ================= ANA EKRAN ================= */
 function renderHome(){
  stopClock();
  const card=g=>{
@@ -251,10 +298,11 @@ function renderHome(){
  <section class="today-strip"><span class="daypill">Bugün · ${dayName(TODAY)}</span>${itemsFor(TODAY).map(pill).join("")}</section>
  <div class="sechead"><span class="sec-eyebrow">Sınıf Seç</span><h2>Yoklama Defteri</h2></div>
  <section class="classes">${[9,10,11,12].map(card).join("")}</section>
- <footer class="foot">İşaretlemeler bu cihazda otomatik saklanır · ${fmtLong(MIN)} – ${fmtLong(MAX)} arası aktif dönem</footer>`;
+ <footer class="foot">Veriler bulutta (Firebase) anlık senkronize edilir · ${fmtLong(MIN)} – ${fmtLong(MAX)}</footer>`;
  startClock();
 }
 
+/* ================= SINIF EKRANI ================= */
 function renderGrade(keepScroll){
  stopClock();
  const y=window.scrollY,g=S.grade,cs=GRADE_STYLE[g],items=itemsFor(S.date),st=statsFor(S.date,g);
@@ -266,7 +314,7 @@ function renderGrade(keepScroll){
    <div class="gtitle"><span class="gdot" style="background:${cs.acc}"></span>
      <div><div class="glabel">${g}. SINIF YOKLAMASI</div><div class="gsub">${STUDENTS[g].length} öğrenci · ${wd} programı · ${items.length} vakit</div></div>
    </div>
-   <div class="savepill"><span class="savedot"></span>Otomatik kayıt</div>
+   <div class="savepill"><span class="savedot"></span>Buluta Kaydediliyor</div>
  </div>
  <section class="datenav" style="--acc:${cs.acc}">
    <button class="arrow" data-act="prev" ${S.date<=MIN?"disabled":""} title="Önceki gün">${chev(true)}</button>
@@ -339,6 +387,7 @@ function renderTab(){
  }
 }
 
+/* ================= İŞLEMLER ================= */
 function doToggle(n,it){
  DATA[S.date]=DATA[S.date]||{};const gd=DATA[S.date][S.grade]=DATA[S.date][S.grade]||{};
  const st=gd[n]=gd[n]||{};if(st[it])delete st[it];else st[it]=true;
@@ -371,12 +420,6 @@ document.addEventListener("click",e=>{
  else if(act==="clear"){if(confirm("Bu tarih için "+S.grade+". sınıfın tüm işaretleri silinsin mi?"))markAll(false);}
  else if(act==="toggle")doToggle(el.dataset.name,el.dataset.item);
 });
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  });
-}
 
 renderHome();
 </script>
